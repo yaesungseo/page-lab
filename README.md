@@ -8,7 +8,7 @@ https://yaesungseo.github.io/page-lab/
 
 ## What this repository contains
 
-- A dependency-free HTML/CSS/JavaScript viewer with Korean explanations.
+- A dependency-free HTML/CSS/JavaScript viewer with English explanations.
 - A synthetic 20-access replay exported from a local C virtual-memory simulator.
 - Raw JSONL events, including before/after frame snapshots and Clock scan decisions.
 
