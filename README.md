@@ -1,33 +1,68 @@
 # Page / Lab
 
-An interactive Clock Sweep page-replacement visualizer. Explore virtual-to-physical address translation, reference bits, dirty-page eviction, and swap restoration one memory access at a time.
+**C-based virtual memory management, made visible.**
 
-## Live demo
+Page / Lab presents the memory-management logic I implemented in C for Georgia Tech's CS2200 Computer Systems and Networks course. The core work covers address translation, page faults, page replacement, and process-level memory management within a provided simulator framework.
 
-https://yaesungseo.github.io/page-lab/
+My interest is in hardware and computer architecture, particularly how architectural state and operating-system decisions work together to manage memory. I extended this project with Codex to make those mechanisms easier to inspect and explain through an interactive visualization.
 
-## What this repository contains
+[Explore the live demo](https://yaesungseo.github.io/page-lab/)
 
-- A dependency-free HTML/CSS/JavaScript viewer with English explanations.
-- A synthetic 20-access replay exported from a local C virtual-memory simulator.
-- Raw JSONL events, including before/after frame snapshots and Clock scan decisions.
+## Core work: memory management in C
 
-The browser replays actual C-engine output; it does not reimplement the replacement algorithm. This first version uses one process, five virtual pages, and three data frames plus two protected system frames.
+Within the course-provided framework, I implemented:
 
-The C engine originated from a Georgia Tech CS2200 course project. Course-provided source code, assignment solutions, original traces, and assignment documents are intentionally not included in this public repository. The viewer and instrumentation were developed with Codex assistance.
+- **Address translation:** split virtual addresses into virtual page numbers and offsets, locate page-table entries, and compute physical addresses.
+- **Page-fault handling:** allocate a physical frame, restore a page from swap or zero-fill a new page, and establish its mapping.
+- **Page replacement:** implement Approximate LRU and Second-Chance / Clock Sweep, while keeping protected system frames out of eviction.
+- **Dirty-page eviction:** write modified pages to swap before reusing their frames and invalidate the old mappings.
+- **Process memory lifecycle:** initialize per-process page tables, switch the page-table base register on context switches, and release frames and swap entries on process termination.
+- **Performance accounting:** track memory accesses, page faults, writebacks, and simulated average memory access time (AMAT).
 
-## Run locally
+The implementation required keeping page tables, frame ownership, reference bits, dirty bits, and swap metadata consistent as memory was allocated and reused.
 
-Open `index.html` in a browser, or run:
+## Connection to hardware and architecture
+
+The project explores the hardware–software interface behind virtual memory: address decomposition, page-table state, physical-frame allocation, and the cost of moving data between memory and backing storage.
+
+The simulated system uses 24-bit virtual addresses, 20-bit physical addresses, and 16 KiB pages. The visual demo constrains allocation to five physical frames: two for system structures and three for data.
+
+This is a C systems simulation; it does not include an RTL implementation or a physical processor. It provides a foundation for my continued work in computer architecture and memory systems.
+
+## How I used Codex
+
+I used Codex to turn the existing C implementation into an inspectable demonstration. Codex helped add event instrumentation, build and refine the HTML/CSS/JavaScript interface, automate validation, and publish the viewer with GitHub Pages.
+
+The website's purpose is to communicate the systems work. My primary technical contribution is the course-project memory-management implementation; the visualization and instrumentation are subsequent Codex-assisted extensions. The simulator framework and supporting utilities were supplied by the course.
+
+## From engine execution to visualization
+
+```text
+Memory-access trace → C simulator → JSONL events → Browser replay
+```
+
+The C engine records address translations, frame snapshots, Clock scan decisions, evictions, and swap activity. The browser displays those recorded results. The public site replays a fixed trace; it does not run the C engine or compute replacement decisions in JavaScript.
+
+The current viewer focuses on **Clock Sweep**. Approximate LRU is implemented in the underlying C project but is not yet exposed in the viewer.
+
+## What to inspect
+
+- **Access 5:** three referenced pages receive a second chance. Dirty P0 is then evicted and written to swap.
+- **Access 9:** P0 is restored from swap, preserving the previously written value **42**.
+- **Final state:** 20 accesses, 17 page faults, 3 hits, and 3 writebacks.
+
+Step through the trace with Previous/Next, the timeline, or arrow keys, or use automatic playback.
+
+During local validation, the original nine C unit tests passed. After instrumentation was added, all 15 full outputs across five course traces and three existing policies matched both the pre-extension engine and the supplied reference outputs. Additional tests checked instrumentation neutrality, swap data preservation, process isolation, and event consistency. These checks ran against the local engine; the public repository does not contain an independently runnable C test suite.
+
+AMAT uses the course's simulation cost model, including a fault cost for first-time allocation. It is not measured hardware latency.
+
+## Public repository scope
+
+This repository contains the viewer, a synthetic demo replay, and raw JSONL events. Course-provided C source, assignment solutions, original course traces, and assignment documents are excluded from the public repository.
+
+To view locally, open `index.html` in a browser, or run:
 
 ```sh
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
-
-## Explore
-
-- Access 5: Clock clears three reference bits, then evicts dirty P0.
-- Access 9: P0 is restored from swap and the value 42 is preserved.
-- Use Previous/Next, the timeline, arrow keys, or automatic playback.
-
-AMAT is a simulation cost model, not measured hardware latency. The demo completes with 20 accesses, 17 faults, 3 hits, and 3 writebacks.
