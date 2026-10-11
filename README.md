@@ -43,17 +43,20 @@ Memory-access trace → C simulator → JSONL events → Browser replay
 
 The C engine records address translations, frame snapshots, Clock scan decisions, evictions, and swap activity. The browser displays those recorded results. The public site replays a fixed trace; it does not run the C engine or compute replacement decisions in JavaScript.
 
-The current viewer focuses on **Clock Sweep**. Approximate LRU is implemented in the underlying C project but is not yet exposed in the viewer.
+The viewer compares **Clock Sweep, Approximate LRU, and the course-provided Random baseline** on the same trace and frame budget. Three synchronized cards show resident pages, the current eviction or hit, and cumulative faults, hits, and writebacks. Select a card to inspect its address translation, frame transitions, and decision explanation. A cumulative fault chart tracks all three policies through the selected access.
+
+Approximate LRU exposes its 8-bit aging counters. The daemon runs before every fifth access, so each recorded “before” snapshot already includes any aging update. Random uses the supplied fixed-state PRNG and ordered coin-flip scan with a last-frame fallback; it is not uniform random selection, and this replay is one reproducible run rather than an average.
 
 ## What to inspect
 
-- **Access 5:** three referenced pages receive a second chance. Dirty P0 is then evicted and written to swap.
-- **Access 9:** P0 is restored from swap, preserving the previously written value **42**.
-- **Final state:** 20 accesses, 17 page faults, 3 hits, and 3 writebacks.
+- **Clock Sweep, access 5:** three referenced pages receive a second chance. Dirty P0 is then evicted and written to swap.
+- **Clock Sweep, access 9:** P0 is restored from swap, preserving the previously written value **42**.
+- **Compare access 9:** Clock Sweep evicts P3, Approximate LRU evicts P4, and Random evicts P2 for the same read of P0.
+- **After 20 accesses:** Clock Sweep has 17 faults / 3 hits / 3 writebacks; Approximate LRU has 12 / 8 / 2; Random has 13 / 7 / 2. These results describe this small synthetic trace, not a general policy ranking.
 
 Step through the trace with Previous/Next, the timeline, or arrow keys, or use automatic playback.
 
-During local validation, the original nine C unit tests passed. After instrumentation was added, all 15 full outputs across five course traces and three existing policies matched both the pre-extension engine and the supplied reference outputs. Additional tests checked instrumentation neutrality, swap data preservation, process isolation, and event consistency. These checks ran against the local engine; the public repository does not contain an independently runnable C test suite.
+During local validation, the original nine C unit tests passed. After instrumentation was added, all 15 full outputs across five course traces and three existing policies matched both the pre-extension engine and the supplied reference outputs. The comparison extension passes ten Python tests (including the nine original C unit tests), checking instrumentation neutrality, swap data preservation, process isolation, exact browser-payload agreement for all three policies, identical access sequences, aging boundaries, and Random replay reproducibility. These checks ran against the local engine; the public repository does not contain an independently runnable C test suite.
 
 AMAT uses the course's simulation cost model, including a fault cost for first-time allocation. It is not measured hardware latency.
 

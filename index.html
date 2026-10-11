@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Explore Clock Sweep page replacement, address translation, and swap activity through real C-engine replay data.">
+  <meta name="description" content="Compare Clock Sweep, Approximate LRU, and Random page replacement through real C-engine replay data.">
   <title>Page / Lab — Virtual Memory Visualizer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101c30'/%3E%3Cpath d='M8 9h16v4H8zm0 6h10v4H8zm0 6h16v3H8z' fill='%23fac65a'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=3">
-  <script src="demo-data.js" defer></script>
-  <script src="app.js?v=2" defer></script>
+  <link rel="stylesheet" href="styles.css?v=4">
+  <script src="demo-data.js?v=4" defer></script>
+  <script src="app.js?v=4" defer></script>
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="./" aria-label="Page Lab home"><span class="brand-icon" aria-hidden="true">▤</span> PAGE <span class="slash">/</span> LAB</a>
     <span class="top-context">Virtual memory explorer</span>
-    <span class="version">01 <span>Clock Sweep</span></span>
+    <span class="version">02 <span>Policy comparison</span></span>
   </header>
   <main>
     <div class="intro">
-      <div><p class="eyebrow">PAGE REPLACEMENT / EXPERIMENT 01</p><h1>Inside Clock Sweep</h1><p class="subtitle">Follow each memory access. See what stays, what moves, and why.</p></div>
+      <div><p class="eyebrow">PAGE REPLACEMENT / EXPERIMENT 02</p><h1>Same accesses. Different decisions.</h1><p class="subtitle">Compare three replacement policies, one memory access at a time.</p></div>
       <div class="dataset-note"><span class="source-label">C ENGINE REPLAY</span><span>5 pages · 3 data frames</span><span>1 process · 20 accesses</span></div>
     </div>
 
@@ -34,17 +34,27 @@
         <label class="speed-label">Speed<select id="speed"><option value="2000">0.5×</option><option value="1000" selected>1×</option><option value="500">2×</option></select></label>
       </div>
       <div id="timeline" class="timeline" aria-label="Access sequence"></div>
-      <div class="timeline-caption"><span>R Read · W Write <span class="key-hint">/ Use ← → to step</span></span><span><i class="legend-dot fault-dot"></i> Page fault <i class="legend-dot hit-dot"></i> Hit</span></div>
+      <div class="timeline-caption"><span>R Read · W Write <span class="key-hint">/ Use ← → to step</span></span><span><span id="timeline-policy"></span><i class="legend-dot fault-dot"></i> Page fault <i class="legend-dot hit-dot"></i> Hit</span></div>
       <label class="sr-only" for="seek">Select access step</label><input id="seek" type="range" min="0" max="19" value="0" aria-valuetext="Access 1">
     </section>
 
+    <section class="comparison" aria-labelledby="comparison-title">
+      <div class="section-heading"><h2 id="comparison-title">Three policies, one trace</h2><span class="muted">Select a policy to inspect below</span></div>
+      <div id="policy-cards" class="policy-cards"></div>
+      <p id="comparison-note" class="comparison-note" aria-live="polite"></p>
+      <details class="chart-details" open><summary>Cumulative page faults</summary>
+        <div id="fault-chart" class="fault-chart"></div>
+        <p class="chart-caption">X: access number · Y: cumulative faults · lower means fewer faults on this trace. Random uses one reproducible run, not an average.</p>
+      </details>
+    </section>
+    <div class="section-heading detail-heading"><h2 id="detail-title">Clock Sweep · inside the decision</h2><a id="event-download" href="clock-demo.jsonl" download>Download policy events</a></div>
     <div class="workspace">
       <section class="memory-panel" aria-labelledby="memory-title">
         <div class="section-heading"><h2 id="memory-title">Physical memory</h2><span class="muted">Before → after</span></div>
         <div class="translation" id="translation"></div>
         <div id="frames" class="frames"></div>
         <div class="memory-footer"><span>F00 <b>Frame table</b></span><span>F01 <b>Page table</b></span><span class="protected-note">Protected · never evicted</span></div>
-        <div class="bits-legend"><span><b>R</b> Referenced · 1 grants a second chance</span><span><b>D</b> Dirty · 1 requires writeback on eviction</span></div>
+        <div class="bits-legend"><span><b>R</b> Referenced · policy-specific use</span><span><b>D</b> Dirty · 1 requires writeback on eviction</span></div>
       </section>
 
       <aside class="decision-panel" aria-labelledby="decision-title">
@@ -68,7 +78,9 @@
       <p>Each page is 16 KiB. Two of the five active physical frames hold system structures; three hold data. This fixed demo repeatedly accesses five virtual pages at byte offset 8.</p>
       <p>Free frames are used first. When memory is full, Clock Sweep scans from the frame after the last eviction. It clears R=1 bits and replaces the first page with R=0. The accessed page ends with R=1.</p>
       <p>AMAT = (accesses × 200 + faults × 150,000 + writebacks × 250,000) ÷ accesses. This course model charges a fault cost even for first-time allocation. Values are simulated costs, not measured hardware latency.</p>
-      <a href="clock-demo.jsonl" download>Download raw event data</a>
+      <p>Approximate LRU chooses the lowest 8-bit aging counter, breaking ties by frame order. Before every fifth access, the daemon shifts counters right, inserts the previous R bit into the high bit, and clears R. The “before” snapshot is after this update.</p>
+      <p>Random is the course-provided baseline: it visits eligible frames in order, accepting each on an odd PRNG result, with the last eligible frame as fallback. It is not uniform sampling. The PRNG starts from the same fixed state for each engine run.</p>
+      <p>Approximate LRU and Clock Sweep are the original student implementations. Event instrumentation and this comparison interface are Codex-assisted extensions. All policies use the exact same 20-access trace and frame budget; this small illustrative workload does not establish a general ranking.</p>
     </div></details>
     <footer><span>PAGE / LAB <span class="footer-sep">·</span> Virtual Memory & Page Replacement Visualizer</span><span>Built from real C-engine events</span></footer>
   </main>
